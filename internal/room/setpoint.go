@@ -31,9 +31,9 @@ func (svc *SetpointService) Set(roomID string, value float64) error {
 	updated := r
 	updated.Setpoint = value
 	updated.UpdatedAt = svc.clock.Now()
-	svc.cache.Set(updated)
 	if err := svc.store.SaveRoom(updated); err != nil {
 		return fmt.Errorf("persist setpoint for %s: %w", roomID, err)
 	}
+	svc.cache.Set(updated)
 	return nil
 }
