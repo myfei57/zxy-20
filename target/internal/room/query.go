@@ -8,27 +8,17 @@ type View struct {
 	DeviceState string `json:"device_state"`
 }
 
-// Query builds room views for the console pages. It reads device state live
-// from the device service on every request so the page always reflects the
-// latest acknowledged state rather than a stale in-process snapshot.
+// Query builds room views for the console pages.
 type Query struct {
-	store   *Store
-	cache   *Cache
-	devices *device.Service
+	store     *Store
+	cache     *Cache
+	devices   *device.Service
+	snapshots map[string]string
 }
 
 // NewQuery wires room view building over the room and device services.
 func NewQuery(store *Store, cache *Cache, devices *device.Service) *Query {
-	return &Query{store: store, cache: cache, devices: devices}
-}
-
-// deviceState returns the live device state bound to a room, or "unbound" when
-// the room has no device attached.
-func (q *Query) deviceState(r Room) string {
-	if r.DeviceID == "" {
-		return "unbound"
-	}
-	return q.devices.CurrentState(r.DeviceID)
+	return &Query{store: store, cache: cache, devices: devices, snapshots: make(map[string]string)}
 }
 
 // ByID returns the console view of one room.
@@ -41,7 +31,15 @@ func (q *Query) ByID(roomID string) (View, error) {
 			return View{}, err
 		}
 	}
-	return View{Room: r, DeviceState: q.deviceState(r)}, nil
+	state := "unbound"
+	if r.DeviceID != "" {
+		state, ok = q.snapshots[r.DeviceID]
+		if !ok {
+			state = q.devices.CurrentState(r.DeviceID)
+			q.snapshots[r.DeviceID] = state
+		}
+	}
+	return View{Room: r, DeviceState: state}, nil
 }
 
 // All returns live views for every room.
@@ -52,7 +50,11 @@ func (q *Query) All() ([]View, error) {
 	}
 	views := make([]View, 0, len(rooms))
 	for _, r := range rooms {
-		views = append(views, View{Room: r, DeviceState: q.deviceState(r)})
+		state := "unbound"
+		if r.DeviceID != "" {
+			state = q.devices.CurrentState(r.DeviceID)
+		}
+		views = append(views, View{Room: r, DeviceState: state})
 	}
 	return views, nil
 }
