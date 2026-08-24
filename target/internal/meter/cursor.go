@@ -39,14 +39,12 @@ func (s *CursorStore) Advance(meterID string, sequence int64) error {
 	return store.WriteJSON(s.base, cursorPrefix+meterID+".json", cursorRecord{Cursor: sequence})
 }
 
-// AdvanceAfterValue persists a reading and only then advances the meter
-// cursor, so a failed append leaves the cursor behind for a safe retry
-// instead of skipping a reading and leaving a gap in the durable series.
+// AdvanceAfterValue persists a reading and advances the meter cursor.
 func (s *CursorStore) AdvanceAfterValue(r Reading) error {
-	if err := s.readings.Append(r); err != nil {
+	if err := s.Advance(r.MeterID, r.Sequence); err != nil {
 		return err
 	}
-	return s.Advance(r.MeterID, r.Sequence)
+	return s.readings.Append(r)
 }
 
 // Collect reads one meter sample and advances the meter cursor.
