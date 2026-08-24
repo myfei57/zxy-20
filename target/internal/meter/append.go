@@ -51,10 +51,10 @@ func (svc *Service) Ingest(meterID string, value float64) error {
 		return err
 	}
 	reading := Reading{MeterID: meterID, Sequence: sequence + 1, Value: value, TakenAt: svc.clock.Now()}
-	if err := svc.quota.Check(m.RoomID, value); err != nil {
+	if err := svc.readings.Append(reading); err != nil {
 		return err
 	}
-	if err := svc.readings.Append(reading); err != nil {
+	if err := svc.quota.Check(m.RoomID, value); err != nil {
 		return err
 	}
 	if err := svc.cursor.Advance(meterID, reading.Sequence); err != nil {
